@@ -31,7 +31,7 @@ plt.ylabel('y')
 plt.title('No outliers')
 plt.legend()
 # plt.show()
-plt.savefig('no_outliers.png')
+plt.savefig('imgs/no_outliers.png')
 
 ### Part 2: adding outliers to l1 vs l2 line fits
 # adjust data by adding outlyers
@@ -52,7 +52,7 @@ plt.ylabel('y')
 plt.title('With outliers')
 plt.legend()
 # plt.show()
-plt.savefig('with_outliers.png')
+plt.savefig('imgs/with_outliers.png')
 
 ### Part 3: simple wave reconstruction
 n = 5000
@@ -85,7 +85,7 @@ plt.xlabel('k')
 plt.ylabel('yt')
 
 plt.subplots_adjust(top = 0.90, bottom=0.1, hspace=0.5, wspace=0.4)
-plt.savefig('waves.png')
+plt.savefig('imgs/waves.png')
 
 ### Part 4: undersample the waves
 # extract small sample of signal
@@ -108,7 +108,7 @@ plt.xlabel('t')
 plt.ylabel('y')
 
 plt.subplots_adjust(left=0.1, right=0.9, top = 0.90, bottom=0.1, hspace=0.5, wspace=0.2)
-plt.savefig('undersampled.png')
+plt.savefig('imgs/undersampled.png')
 
 ### Part 5: convex optimization minimizing L1 norm to observations to solve inverse problem
 # create idct matrix operator
@@ -148,4 +148,4 @@ plt.plot(t1[:m],sig[:m])
 plt.xlabel('t')
 plt.ylabel('y')
 
-plt.savefig('wave_recon.png')
+plt.savefig('imgs/wave_recon.png')

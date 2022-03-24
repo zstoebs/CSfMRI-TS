@@ -180,7 +180,7 @@ plt.subplot(133)
 plt.imshow(Z[0])
 plt.title('reconstruction')
 
-plt.savefig('optimized_recon=0.1.png')
+plt.savefig('imgs/optimized_recon=0.1.png')
 
 plt.figure()
 plt.subplot(131)
@@ -195,4 +195,4 @@ plt.subplot(133)
 plt.imshow(Z[1])
 plt.title('reconstruction')
 
-plt.savefig('optimized_recon=0.01.png')
+plt.savefig('imgs/optimized_recon=0.01.png')

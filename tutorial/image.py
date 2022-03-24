@@ -36,7 +36,7 @@ plt.subplot(133)
 plt.imshow(dct2(X), cmap='gray')
 plt.title('DCT downsized')
 
-plt.savefig('in_image.png')
+plt.savefig('imgs/in_image.png')
 
 # Part 2: construct compressed sensing problem for a 2D image
 # extract small sample of signal
@@ -93,4 +93,4 @@ plt.title('reconstructed')
 
 
 plt.subplots_adjust(left=0.1, right=0.9, top = 0.90, bottom=0.1, hspace=0.5, wspace=0.3)
-plt.savefig('image_recon.png')
+plt.savefig('imgs/image_recon.png')
