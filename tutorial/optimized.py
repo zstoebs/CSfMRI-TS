@@ -8,7 +8,7 @@ import cvxpy as cvx
 import cv2
 from lbfgs import fmin_lbfgs as owlqn  # pip install pylbfgs or (deprecated) https://bitbucket.org/rtaylor/pylbfgs/src/master/
 import time
-# from datetime import timedelta
+from datetime import timedelta
 
 
 ### **optimized** 2D image reconstruction
@@ -18,7 +18,7 @@ def progress(x, g, fx, xnorm, gnorm, step, k, ls):
     """Display the current iteration.
     """
     if k % 10 == 0:
-        print('Iteration {}         Xnorm {}            Gnorm {}'.format(k, xnorm, gnorm))
+        print('{}         Xnorm = {:.3f}            Gnorm = {:.3f}'.format(k, xnorm, gnorm))
     return 0  # expects return of 0 for exit success
 
 def dct2(x):
@@ -164,9 +164,8 @@ for i,s in enumerate(sample_sizes):
         Z[i][:,:,j] = Xa.astype('uint8')
 
 tend = time.time()
-elapsed = tstart - tend
-# print('Runtime: ', timedelta(seconds=elapsed))
-print('Runtime: ', elapsed)
+elapsed = tend - tstart
+print('Runtime: ', timedelta(seconds=elapsed))
 
 plt.figure()
 plt.subplot(131)
