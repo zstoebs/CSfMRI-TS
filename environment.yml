@@ -26,6 +26,7 @@ dependencies:
     - fonttools==4.31.2
     - kiwisolver==1.4.0
     - matplotlib==3.5.1
+    - nibabel==3.2.2
     - numpy==1.22.3
     - opencv-python==4.5.5.64
     - osqp==0.6.2.post5

@@ -1,6 +1,8 @@
 # CSfMRI-TS
 Author: Zach Stoebner
+
 EECE 8396 S22
+
 
 ## Description
 Exploring compressed sensing fMRI time series.
