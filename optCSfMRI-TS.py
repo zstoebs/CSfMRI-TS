@@ -18,7 +18,7 @@ from lbfgs import fmin_lbfgs as owlqn  # pip install pylbfgs or (deprecated) htt
 import time
 from datetime import timedelta
 import nibabel as nb
-from util import double_gamma_HRF, create_task_impulse, CS_L1_opt
+from util import double_gamma_HRF, create_task_impulse, CS_L1_opt, rmse
 
 def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     """
@@ -64,6 +64,7 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     response = np.convolve(impulse, hrf, mode='full')  # mode = 'full', 'valid', 'same'
     response = response[:nframes]
 
+    #TODO compute nyquist resp rate --> use FFT instead of DCT for freqs??
     respt = spfft.dct(response, norm='ortho')
     impt = spfft.dct(impulse, norm='ortho')
 
@@ -190,9 +191,9 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
         sighat = spfft.idct(xhat, norm='ortho', axis=0)
         sigr = spfft.idct(xr, norm='ortho', axis=0)
         
-        y_err = np.mean(np.square(y - sig))
-        yhat_err = np.mean(np.square(yhat - sighat))
-        yr_err = np.mean(np.square(yr - sigr))
+        y_err = rmse(y, sig)
+        yhat_err = rmse(yhat, sighat)
+        yr_err = rmse(yr, sigr)
         errors += [(y_err, yhat_err, yr_err)]
 
         # plot sensing results
@@ -246,16 +247,16 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     # error curve
     errors = np.asarray(errors)
     nyHRFPercent = TR*nyHRF  # length*rate / nframes = nframes*TR*nyquist / nframes = TR*nyquist
-    nyRespPercent = TR*nyResp
+    # nyRespPercent = TR*nyResp
 
     plt.figure()
     plt.plot(levels, errors[:,0], label='Y')
     plt.plot(levels, errors[:, 1], label='Yhat')
     plt.plot(levels, errors[:, 2], label='Yr')
     plt.axvline(x=nyHRFPercent, label='% HRF Nyquist', c='c', ls='--')
-    plt.axvline(x=nyRespPercent, label='% Resp Nyquist', c='m', ls='--')
+    # plt.axvline(x=nyRespPercent, label='% Resp Nyquist', c='m', ls='--')
     plt.xlabel('Percent sampled')
-    plt.ylabel('MSE')
+    plt.ylabel('RMSE')
     plt.legend()
     plt.savefig('results/error.png')
 

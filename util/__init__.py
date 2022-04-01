@@ -7,6 +7,32 @@ Utilities for compressed sensing fMRI time series.
 import numpy as np
 import cvxpy as cvx
 
+def mse(true, pred):
+    """
+    Compute mean squared error.
+
+    Params:
+        true = true signal
+        pred = predicted signal
+
+    Returns:
+        mse scalar
+    """
+    return np.mean(np.square(true - pred))
+
+def rmse(true, pred):
+    """
+    Compute root mean squared error.
+
+    Params:
+        true = true signal
+        pred = predicted signal
+
+    Returns:
+        rmse scalar
+    """
+    return np.sqrt(mse(true, pred))
+
 def double_gamma_HRF(TR, tmax=30):
     """
     Construct a hemodynamic response function (HRF) based on a double-gamma fit in Glover et al. 1999, "Deconvolution
