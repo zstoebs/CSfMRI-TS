@@ -20,14 +20,18 @@ from datetime import timedelta
 import nibabel as nb
 from util import double_gamma_HRF, create_task_impulse, CS_L1_opt
 
-def CS_Ex4(ffmri, ftask, slice=10):
+def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     """
     Compressed sensing on data from class exercise.
 
     Params:
-    ffmri = fMRI filename
-    ftask = task spreadsheet filename
-    slice = slice number for voxel analysis
+        ffmri = fMRI filename
+        ftask = task spreadsheet filename
+        slice = slice number for voxel analysis
+        verbose = true to display optimization summaries
+    
+    Returns:
+        void
     """
 
     fmri = nb.load(ffmri)
@@ -38,7 +42,13 @@ def CS_Ex4(ffmri, ftask, slice=10):
     t = np.arange(nframes)
 
     print('Generating HRF...')
-    t_hrf, hrf = double_gamma_HRF(TR)
+    t_hrf, hrf, nyHRF = double_gamma_HRF(TR)
+
+    rate = 1/TR
+    if rate >= nyHRF:
+        print('Sampled above the Nyquist rate for HRF. Rate = %.2f HZ >= %.2f Hz = Nyquist' % (rate, nyHRF))
+    else:
+        print('Sampled below the Nyquist rate for HRF. Rate = %.2f HZ < %.2f Hz = Nyquist' % (rate, nyHRF))
 
     plt.figure()
     plt.plot(t_hrf,hrf)
@@ -48,19 +58,31 @@ def CS_Ex4(ffmri, ftask, slice=10):
 
     # response function on 20-second task, every 60 secs, starting at 30 secs
     task = pd.read_csv(ftask, sep='\t')
-    onsets = np.arange(30, 270, 60) #TODO generalize to generic task input file
-    durations = np.ones(onsets.shape) * 20
-
+    onsets = task['onset'].to_numpy()
+    durations = task['duration'].to_numpy()
     impulse = create_task_impulse(nframes, onsets // TR, durations // TR)
     response = np.convolve(impulse, hrf, mode='full')  # mode = 'full', 'valid', 'same'
     response = response[:nframes]
 
+    respt = spfft.dct(response, norm='ortho')
+    impt = spfft.dct(impulse, norm='ortho')
+
     plt.figure()
+
+    plt.subplot(211)
     plt.plot(response, label='response')
     plt.plot(impulse, label='impulse')
     plt.xlabel('frame')
-    plt.title('expected response function')
+    plt.title('Expected response given impulse')
     plt.legend()
+    plt.subplot(212)
+    plt.plot(respt, label='resp DCT')
+    plt.plot(impt, label='imp DCT')
+    plt.xlabel('k')
+    plt.legend()
+    plt.title('Response + impulse DCT')
+
+    plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.5, wspace=0.5)
     plt.savefig('results/expected.png')
 
     # design matrix
@@ -145,6 +167,7 @@ def CS_Ex4(ffmri, ftask, slice=10):
     ### L1 convex optimization compressed sensing fMRI time series at varying granularity
 
     # undersample at 10% levels + sense via convex opt
+    errors = []
     levels = np.arange(0.1,1,0.1)
     A = spfft.idct(np.identity(nframes), norm='ortho', axis=0)  # inverse discrete cosine transform
     for level in levels:
@@ -159,13 +182,18 @@ def CS_Ex4(ffmri, ftask, slice=10):
         M = A[ri]
 
         # L1 optimizations + recon
-        x = CS_L1_opt(M, y1)
-        xhat = CS_L1_opt(M, yhat1)
-        xr = CS_L1_opt(M, yr1)
+        x = CS_L1_opt(M, y1, verbose=verbose)
+        xhat = CS_L1_opt(M, yhat1, verbose=verbose)
+        xr = CS_L1_opt(M, yr1, verbose=verbose)
 
         sig = spfft.idct(x, norm='ortho', axis=0)  # fully-sampled inverse cosine transform of input
         sighat = spfft.idct(xhat, norm='ortho', axis=0)
         sigr = spfft.idct(xr, norm='ortho', axis=0)
+        
+        y_err = np.mean(np.square(y - sig))
+        yhat_err = np.mean(np.square(yhat - sighat))
+        yr_err = np.mean(np.square(yr - sigr))
+        errors += [(y_err, yhat_err, yr_err)]
 
         # plot sensing results
         fig = plt.figure(figsize=(20,20))
@@ -215,8 +243,21 @@ def CS_Ex4(ffmri, ftask, slice=10):
         plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.4, wspace=0.5)
         plt.savefig('results/sensing_at_%.1f.png' % level)
 
-    #TODO plot error curve from each level MSE
+    # error curve
+    errors = np.asarray(errors)
+    nyHRFPercent = TR*nyHRF  # length*rate / nframes = nframes*TR*nyquist / nframes = TR*nyquist
+    nyRespPercent = TR*nyResp
 
+    plt.figure()
+    plt.plot(levels, errors[:,0], label='Y')
+    plt.plot(levels, errors[:, 1], label='Yhat')
+    plt.plot(levels, errors[:, 2], label='Yr')
+    plt.axvline(x=nyHRFPercent, label='% HRF Nyquist', c='c', ls='--')
+    plt.axvline(x=nyRespPercent, label='% Resp Nyquist', c='m', ls='--')
+    plt.xlabel('Percent sampled')
+    plt.ylabel('MSE')
+    plt.legend()
+    plt.savefig('results/error.png')
 
 def main(**kwargs):
     print('Executing...')

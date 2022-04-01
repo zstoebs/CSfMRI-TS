@@ -13,8 +13,13 @@ def double_gamma_HRF(TR, tmax=30):
     of impulse response in event-related BOLD fMRI", Neuroimage 9(4):416-29.
 
     Params:
-    TR = temporal resolution at which to sample in tmax
-    tmax = maximum duration for HRF
+        TR = temporal resolution at which to sample in tmax
+        tmax = maximum duration for HRF
+
+    Returns:
+        t = time course underlying HRF
+        h = HRF sequence along t
+        nyquist = Nyquist sampling rate for fMRI volumes
     """
 
     # gamma params
@@ -33,7 +38,9 @@ def double_gamma_HRF(TR, tmax=30):
     h = h1/np.max(h1) - a2*h2/np.max(h2)
     h /= np.max(h)
 
-    return t, h
+    nyquist = 2*(1/tmax)  # double the frequency of 1 HRF at least
+
+    return t, h, nyquist
 
 
 def create_task_impulse(nframes, onsets, durations):
@@ -41,9 +48,12 @@ def create_task_impulse(nframes, onsets, durations):
     Create a task impulse function.
 
     Params:
-    nframes = number of frames, i.e., length of fMRI
-    onsets = list of onset frame indices
-    durations = list of durations in terms of frames
+        nframes = number of frames, i.e., length of fMRI
+        onsets = list of onset frame indices
+        durations = list of durations in terms of frames
+
+    Returns:
+        impulse = task impulse function
     """
 
     assert len(onsets) == len(durations), 'Each onset should have a corresponding duration.'
@@ -56,14 +66,17 @@ def create_task_impulse(nframes, onsets, durations):
 
     return impulse
 
-def CS_L1_opt(M, y):
+def CS_L1_opt(M, y, verbose=True):
     """
     Perform convex L1 optimization for sparse signal reconstruction to solve the compressed sensing problem:
     min ||x||_1 s.t. y = M @ x 
     
     Params: 
-    M = undersampled sparese measurement matrix reflecting the basis of observations
-    y = undersampled observations s.t. m < n for measurement matrix
+        M = undersampled sparese measurement matrix reflecting the basis of observations
+        y = undersampled observations s.t. m < n for measurement matrix
+
+    Returns:
+        x_rec = recovered signal
     """
     
     # perform optimization
@@ -71,7 +84,7 @@ def CS_L1_opt(M, y):
     objective = cvx.Minimize(cvx.norm(x, 1))
     constraints = [M @ x == y]
     prob = cvx.Problem(objective, constraints)
-    result = prob.solve(verbose=True)
+    result = prob.solve(verbose=verbose)
 
     # reconstruct signals
     x_rec = np.array(x.value)
