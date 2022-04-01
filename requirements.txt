@@ -4,3 +4,4 @@ matplotlib
 cvxpy
 PyLBFGS
 nibabel
+pandas

@@ -5,6 +5,7 @@ Utilities for compressed sensing fMRI time series.
 """
 
 import numpy as np
+import cvxpy as cvx
 
 def double_gamma_HRF(TR, tmax=30):
     """
@@ -54,3 +55,26 @@ def create_task_impulse(nframes, onsets, durations):
         impulse[start:end] = 1
 
     return impulse
+
+def CS_L1_opt(M, y):
+    """
+    Perform convex L1 optimization for sparse signal reconstruction to solve the compressed sensing problem:
+    min ||x||_1 s.t. y = M @ x 
+    
+    Params: 
+    M = undersampled sparese measurement matrix reflecting the basis of observations
+    y = undersampled observations s.t. m < n for measurement matrix
+    """
+    
+    # perform optimization
+    x = cvx.Variable(M.shape[-1])
+    objective = cvx.Minimize(cvx.norm(x, 1))
+    constraints = [M @ x == y]
+    prob = cvx.Problem(objective, constraints)
+    result = prob.solve(verbose=True)
+
+    # reconstruct signals
+    x_rec = np.array(x.value)
+    x_rec = np.squeeze(x_rec)
+    
+    return x_rec

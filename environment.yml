@@ -31,11 +31,13 @@ dependencies:
     - opencv-python==4.5.5.64
     - osqp==0.6.2.post5
     - packaging==21.3
+    - pandas==1.4.1
     - pillow==9.0.1
     - pybind11==2.9.1
     - pylbfgs==0.2.0.14
     - pyparsing==3.0.7
     - python-dateutil==2.8.2
+    - pytz==2022.1
     - qdldl==0.1.5.post0
     - scipy==1.8.0
     - scs==3.2.0
