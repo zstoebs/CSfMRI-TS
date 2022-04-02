@@ -13,6 +13,7 @@ import scipy.stats as spstat
 import pandas as pd
 import cv2
 import nibabel as nb
+import argparse
 from util import double_gamma_HRF, \
     create_task_impulse, \
     CS_L1_opt, \
@@ -21,6 +22,17 @@ from util import double_gamma_HRF, \
     psnr, \
     nyquist_rate
 
+def get_args():
+    parser = argparse.ArgumentParser(description='Input args for opt-based CSfMRI-TS',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--fmri', '-f', type=str, default=False,
+                        help='fMRI .nii file to load')
+    parser.add_argument('--task', '-t', type=str, default=False,
+                        help='task .tsv file to load')
+    parser.add_argument('--slice', '-s', type=int, default=10,
+                        help='slice to grab voxel from based on beta search')
+
+    return parser.parse_args()
 
 def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     """
@@ -45,6 +57,8 @@ def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     N = img.shape[-1]
     t = np.arange(N)
     xf = np.abs(np.fft.fftfreq(N, TR))[:N//2]  # positive frequency domain for FFT plotting
+
+    assert slice < img.shape[-2], 'Slice index out of bounds.'
 
     print('Generating HRF...')
     t_hrf, hrf, nyHRF = double_gamma_HRF(TR)
@@ -340,11 +354,11 @@ def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     plt.savefig('results/opt/rmse+psnr.png')
 
 def main(**kwargs):
-    print('Executing...')
+    args = get_args()
 
     ###
-    print('Compressed sensing Ex4...')
-    optCSfMRI_TS('data/fmri_blockDes.nii.gz', 'data/task-checkerboard_events.tsv', slice=10)
+    print('Compressed sensing time series...')
+    optCSfMRI_TS(args.fmri, args.task, slice=args.slice)
 
     return 0
 
