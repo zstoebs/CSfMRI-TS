@@ -15,7 +15,7 @@ def nyquist_rate(ft, xf):
     """
     Computes Nyquist rate.
 
-    Params:
+    Parameters:
         ft = Fourier transform sequence
         xf = corresponding frequency domain
 
@@ -28,7 +28,7 @@ def mse(true, pred):
     """
     Compute mean squared error.
 
-    Params:
+    Parameters:
         true = true signal
         pred = predicted signal
 
@@ -41,7 +41,7 @@ def rmse(true, pred):
     """
     Compute root mean squared error.
 
-    Params:
+    Parameters:
         true = true signal
         pred = predicted signal
 
@@ -54,7 +54,7 @@ def psnr(true, pred):
     """
     Compute peak signal-to-noise ratio for 1D signals.
 
-    Params:
+    Parameters:
         true = true signal
         pred = predicted signal
 
@@ -69,7 +69,7 @@ def scale_fft(ft, N):
     Scales FFT sequence to visualize for N samples. 
     https://stackoverflow.com/questions/25735153/plotting-a-fast-fourier-transform-in-python
     
-    Params:
+    Parameters:
         ft = FFT sequence
         N = sample count
     
@@ -83,7 +83,7 @@ def double_gamma_HRF(TR, tmax=30):
     Construct a hemodynamic response function (HRF) based on a double-gamma fit in Glover et al. 1999, "Deconvolution
     of impulse response in event-related BOLD fMRI", Neuroimage 9(4):416-29.
 
-    Params:
+    Parameters:
         TR = temporal resolution at which to sample in tmax
         tmax = maximum duration for HRF
 
@@ -110,7 +110,7 @@ def double_gamma_HRF(TR, tmax=30):
     h /= np.max(h)
 
     hfft = scale_fft(spfft.fft(h), tmax)
-    xf = np.linspace(0.0, 1.0 / (2.0 * TR), tmax // 2)
+    xf = np.abs(np.fft.fftfreq(tmax, TR))[:tmax//2]
     nyquist = nyquist_rate(hfft, xf)
 
     return t, h, nyquist
@@ -120,7 +120,7 @@ def create_task_impulse(nframes, onsets, durations):
     """
     Create a task impulse function.
 
-    Params:
+    Parameters:
         nframes = number of frames, i.e., length of fMRI
         onsets = list of onset frame indices
         durations = list of durations in terms of frames
@@ -144,7 +144,7 @@ def CS_L1_opt(M, y, verbose=True):
     Perform convex L1 optimization for sparse signal reconstruction to solve the compressed sensing problem:
     min ||x||_1 s.t. y = M @ x 
     
-    Params: 
+    Parameters: 
         M = undersampled sparese measurement matrix reflecting the basis of observations
         y = undersampled observations s.t. m < n for measurement matrix
 

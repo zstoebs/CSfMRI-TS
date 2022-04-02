@@ -26,7 +26,7 @@ def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     """
     Compressed sensing a voxel time series via L1 minimization through convex optimization.
 
-    Params:
+    Parameters:
         ffmri = fMRI filename
         ftask = task spreadsheet filename
         slice = slice number for voxel analysis
@@ -44,7 +44,7 @@ def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     Fs = 1 / TR # sampling frequency
     N = img.shape[-1]
     t = np.arange(N)
-    xf = np.linspace(0.0, 1.0 / (2.0 * TR), N // 2)  # frequency domain for FFT plotting
+    xf = np.abs(np.fft.fftfreq(N, TR))[:N//2]  # positive frequency domain for FFT plotting
 
     print('Generating HRF...')
     t_hrf, hrf, nyHRF = double_gamma_HRF(TR)
@@ -320,8 +320,8 @@ def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     plt.plot(levels, RMSEs[:, 0], label='Y')
     plt.plot(levels, RMSEs[:, 1], label='Yhat')
     plt.plot(levels, RMSEs[:, 2], label='Yr')
-    plt.axvline(x=nyHRFPercent, label='% HRF Nyquist', c='c', ls='--')
-    plt.axvline(x=nyRespPercent, label='% Resp Nyquist', c='m', ls='--')
+    plt.axvline(x=nyHRFPercent, label='%% HRF Nyquist = %.2f' % nyHRFPercent, c='c', ls='--')
+    plt.axvline(x=nyRespPercent, label='%% Resp Nyquist = %.2f' % nyRespPercent, c='m', ls='--')
     plt.xlabel('Percent sampled')
     plt.ylabel('PSNR')
     plt.legend()
@@ -329,8 +329,8 @@ def optCSfMRI_TS(ffmri, ftask, slice=10, verbose=False):
     plt.plot(levels, PSNRs[:,0], label='Y')
     plt.plot(levels, PSNRs[:, 1], label='Yhat')
     plt.plot(levels, PSNRs[:, 2], label='Yr')
-    plt.axvline(x=nyHRFPercent, label='% HRF Nyquist', c='c', ls='--')
-    plt.axvline(x=nyRespPercent, label='% Resp Nyquist', c='m', ls='--')
+    plt.axvline(x=nyHRFPercent, label='%% HRF Nyquist = %.2f' % nyHRFPercent, c='c', ls='--')
+    plt.axvline(x=nyRespPercent, label='%% Resp Nyquist = %.2f' % nyRespPercent, c='m', ls='--')
     plt.xlabel('Percent sampled')
     plt.ylabel('PSNR')
     plt.legend()
