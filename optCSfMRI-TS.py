@@ -6,19 +6,14 @@ Optimization-based compressed sensing of fMRI time series.
 """
 
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import scipy.optimize as spopt
 import scipy.fftpack as spfft
-import scipy.ndimage as spimg
 import scipy.stats as spstat
 import pandas as pd
 import cv2
-from lbfgs import fmin_lbfgs as owlqn  # pip install pylbfgs or (deprecated) https://bitbucket.org/rtaylor/pylbfgs/src/master/
-import time
-from datetime import timedelta
 import nibabel as nb
-from util import double_gamma_HRF, create_task_impulse, CS_L1_opt, rmse
+from util import double_gamma_HRF, create_task_impulse, CS_L1_opt, rmse, scale_fft, psnr
 
 def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     """
@@ -34,21 +29,23 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
         void
     """
 
+    ### SETUP
     fmri = nb.load(ffmri)
     img = fmri.get_fdata()
     hdr = fmri.header
     TR = hdr['pixdim'][4]
-    nframes = img.shape[-1]
-    t = np.arange(nframes)
+    N = img.shape[-1]
+    t = np.arange(N)
+    xf = np.linspace(0.0, 1.0 / (2.0 * TR), N // 2)  # frequency domain for FFT plotting
 
     print('Generating HRF...')
     t_hrf, hrf, nyHRF = double_gamma_HRF(TR)
 
-    rate = 1/TR
-    if rate >= nyHRF:
-        print('Sampled above the Nyquist rate for HRF. Rate = %.2f HZ >= %.2f Hz = Nyquist' % (rate, nyHRF))
+    Fs = 1/TR
+    if Fs >= nyHRF:
+        print('Sampled above the Nyquist rate for HRF. Rate = %.2f HZ >= %.2f Hz = Nyquist' % (Fs, nyHRF))
     else:
-        print('Sampled below the Nyquist rate for HRF. Rate = %.2f HZ < %.2f Hz = Nyquist' % (rate, nyHRF))
+        print('Sampled below the Nyquist rate for HRF. Rate = %.2f HZ < %.2f Hz = Nyquist' % (Fs, nyHRF))
 
     plt.figure()
     plt.plot(t_hrf,hrf)
@@ -60,45 +57,61 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     task = pd.read_csv(ftask, sep='\t')
     onsets = task['onset'].to_numpy()
     durations = task['duration'].to_numpy()
-    impulse = create_task_impulse(nframes, onsets // TR, durations // TR)
+    impulse = create_task_impulse(N, onsets // TR, durations // TR)
     response = np.convolve(impulse, hrf, mode='full')  # mode = 'full', 'valid', 'same'
-    response = response[:nframes]
+    response = response[:N]
 
-    #TODO compute nyquist resp rate --> use FFT instead of DCT for freqs??
-    respt = spfft.dct(response, norm='ortho')
-    impt = spfft.dct(impulse, norm='ortho')
+    # transforms + Nyquist rate
+    respdct = spfft.dct(response, norm='ortho')
+    impdct = spfft.dct(impulse, norm='ortho')
 
-    plt.figure()
+    respfft = spfft.fft(response)
+    impfft = spfft.fft(impulse)
 
-    plt.subplot(211)
+    nyResp = 2 * xf[np.argmax(respfft)]  # double the max frequency of the response FFT
+    if Fs >= nyResp:
+        print('Sampled above the Nyquist rate for response. Rate = %.2f HZ >= %.2f Hz = Nyquist' % (Fs, nyResp))
+    else:
+        print('Sampled below the Nyquist rate for response. Rate = %.2f HZ < %.2f Hz = Nyquist' % (Fs, nyResp))
+
+    plt.figure(figsize=(10,30))
+
+    plt.subplot(311)
     plt.plot(response, label='response')
     plt.plot(impulse, label='impulse')
     plt.xlabel('frame')
     plt.title('Expected response given impulse')
     plt.legend()
-    plt.subplot(212)
-    plt.plot(respt, label='resp DCT')
-    plt.plot(impt, label='imp DCT')
+    plt.subplot(312)
+    plt.plot(respdct, label='resp DCT')
+    plt.plot(impdct, label='imp DCT')
     plt.xlabel('k')
-    plt.legend()
     plt.title('Response + impulse DCT')
+    plt.legend()
+    plt.subplot(313)
+    plt.plot(xf, scale_fft(respfft, N), label='resp FFT')
+    plt.plot(xf, scale_fft(impfft, N), label='imp FFT')
+    plt.xlabel('Hz')
+    plt.title('Response + impulse FFT')
+    plt.legend()
 
     plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.5, wspace=0.5)
     plt.savefig('results/expected.png')
 
+    ### GLM
     # design matrix
     lin = t.copy()
     quad = lin ** 2
     X = np.vstack([lin, quad, response]).T
-    X = np.hstack([np.ones((nframes, 1)), spstat.zscore(X, axis=0)])
-    Y = np.transpose(img, (3, 0, 1, 2)).reshape(nframes, -1)
+    X = np.hstack([np.ones((N, 1)), spstat.zscore(X, axis=0)])
+    Y = np.transpose(img, (3, 0, 1, 2)).reshape(N, -1)
 
     # compute coefs + residual
     Beta = np.linalg.inv(X.T @ X) @ X.T @ Y
     Yhat = X @ Beta
     Yr = Y - Yhat
 
-    # recon images + select voxel with high beta in regressor in slice
+    # recon images + select voxel with high beta in regressor in slice --> discover active voxel
     Yhat_img = Yhat.T.reshape(img.shape)
     Yr_img = Yr.T.reshape(img.shape)
     Beta_map = Beta[-1, :].T.reshape(img.shape[:-1])
@@ -110,70 +123,109 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
     yhat = Yhat_img[i, j, slice, :]
     yr = Yr_img[i, j, slice, :]
 
-    # DCTs of time series
-    yt = spfft.dct(y, norm='ortho')
-    yhatt = spfft.dct(yhat, norm='ortho')
-    yrt = spfft.dct(yr, norm='ortho')
-
-    # iDCTs
-    yti = spfft.idct(yt, norm='ortho', axis=0)
-    yhatti = spfft.idct(yhatt, norm='ortho', axis=0)
-    yrti = spfft.idct(yrt, norm='ortho', axis=0)
-
-    fig = plt.figure(figsize=(20,20))
-
-    # time series row
-    plt.subplot(331)
+    fig = plt.figure(figsize=(30,10))
+    plt.subplot(131)
     plt.plot(y, label='Y')
     plt.xlabel('TR')
     plt.ylabel('Signal')
-    plt.gca().set_title('Y')
-    plt.subplot(332)
+    plt.title('Y')
+    plt.subplot(132)
     plt.plot(yhat, label='Yhat')
     plt.xlabel('TR')
-    plt.gca().set_title('Yhat')
-    plt.subplot(333)
+    plt.title('Yhat')
+    plt.subplot(133)
     plt.plot(yr, label='Yr')
     plt.xlabel('TR')
-    plt.gca().set_title('Yr')
+    plt.title('Yr')
+
+    fig.suptitle('Active voxel time series')
+    plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.4, wspace=0.5)
+    plt.savefig('results/active.png')
+
+    ### TRANSFORMS
+    # DCTs + iDCTs
+    ydct = spfft.dct(y, norm='ortho')
+    yhatdct = spfft.dct(yhat, norm='ortho')
+    yrdct = spfft.dct(yr, norm='ortho')
+
+    ydcti = spfft.idct(ydct, norm='ortho', axis=0)
+    yhatdcti = spfft.idct(yhatdct, norm='ortho', axis=0)
+    yrdcti = spfft.idct(yrdct, norm='ortho', axis=0)
 
     # DCT row
-    plt.subplot(334)
-    plt.plot(yt, label='Yt')
+    fig = plt.figure(figsize=(30,20))
+    plt.subplot(231)
+    plt.plot(ydct, label='Yt')
     plt.xlabel('k')
     plt.ylabel('DCT')
-    plt.subplot(335)
-    plt.plot(yhatt, label='Yhatt')
+    plt.subplot(232)
+    plt.plot(yhatdct, label='Yhatt')
     plt.xlabel('k')
-    plt.subplot(336)
-    plt.plot(yrt, label='Yrt')
+    plt.subplot(233)
+    plt.plot(yrdct, label='Yrt')
     plt.xlabel('k')
 
     # iDCT row
-    plt.subplot(337)
-    plt.plot(yti, label='Yti')
+    plt.subplot(234)
+    plt.plot(ydcti, label='Yti')
     plt.xlabel('TR')
     plt.ylabel('iDCT')
-    plt.subplot(338)
-    plt.plot(yhatti, label='Yhatti')
+    plt.subplot(235)
+    plt.plot(yhatdcti, label='Yhatti')
     plt.xlabel('TR')
-    plt.subplot(339)
-    plt.plot(yrti, label='Yrti')
+    plt.subplot(236)
+    plt.plot(yrdcti, label='Yrti')
     plt.xlabel('TR')
 
-    fig.suptitle('Active voxel time series + FFTs + iFFTs')
+    fig.suptitle('Active DCTs + iDCTs')
     plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.4, wspace=0.5)
-    plt.savefig('results/active_ts+fft+ifft.png')
+    plt.savefig('results/dct.png')
 
-    ### L1 convex optimization compressed sensing fMRI time series at varying granularity
+    # FFT + iFFT
+    yfft = spfft.fft(y)
+    yhatfft = spfft.fft(yhat)
+    yrfft = spfft.fft(yr)
 
-    # undersample at 10% levels + sense via convex opt
+    yffti = spfft.ifft(yfft)
+    yhatffti = spfft.ifft(yhatfft)
+    yrffti = spfft.ifft(yrfft)
+
+    # FFT row
+    fig = plt.figure(figsize=(30,20))
+    plt.subplot(231)
+    plt.plot(xf, scale_fft(yfft, N), label='Yt')
+    plt.xlabel('Hz')
+    plt.ylabel('FFT')
+    plt.subplot(232)
+    plt.plot(xf, scale_fft(yhatfft, N), label='Yhatt')
+    plt.xlabel('Hz')
+    plt.subplot(233)
+    plt.plot(xf, scale_fft(yrfft, N), label='Yrt')
+    plt.xlabel('Hz')
+
+    # iFFT row
+    plt.subplot(234)
+    plt.plot(yffti.real, label='Yti')
+    plt.xlabel('TR')
+    plt.ylabel('iFFT')
+    plt.subplot(235)
+    plt.plot(yhatffti.real, label='Yhatti')
+    plt.xlabel('TR')
+    plt.subplot(236)
+    plt.plot(yrffti.real, label='Yrti')
+    plt.xlabel('TR')
+
+    fig.suptitle('Active FFTs + iFFTs')
+    plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.4, wspace=0.5)
+    plt.savefig('results/fft.png')
+
+    ### L1 CONVEX OPT
     errors = []
-    levels = np.arange(0.1,1,0.1)
-    A = spfft.idct(np.identity(nframes), norm='ortho', axis=0)  # inverse discrete cosine transform
+    levels = np.arange(0.1,1,0.1) # undersample at 10% levels + sense via convex opt
+    A = spfft.idct(np.identity(N), norm='ortho', axis=0)  # inverse discrete cosine transform
     for level in levels:
-        m = int(level * nframes)
-        ri = np.random.choice(nframes, m, replace=False)  # random sample of indices
+        m = int(level * N)
+        ri = np.random.choice(N, m, replace=False)  # random sample of indices
         ri.sort()  # sorting not strictly necessary, but convenient for plotting
 
         y1 = y[ri]
@@ -191,9 +243,9 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
         sighat = spfft.idct(xhat, norm='ortho', axis=0)
         sigr = spfft.idct(xr, norm='ortho', axis=0)
         
-        y_err = rmse(y, sig)
-        yhat_err = rmse(yhat, sighat)
-        yr_err = rmse(yr, sigr)
+        y_err = psnr(y, sig)
+        yhat_err = psnr(yhat, sighat)
+        yr_err = psnr(yr, sigr)
         errors += [(y_err, yhat_err, yr_err)]
 
         # plot sensing results
@@ -224,18 +276,18 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
 
         # spectral: original + recon
         plt.subplot(234)
-        plt.plot(yt, label='Yt')
+        plt.plot(ydct, label='Yt')
         plt.plot(x, label='x')
         plt.xlabel('k')
         plt.ylabel('DCT')
         plt.legend()
         plt.subplot(235)
-        plt.plot(yhatt, label='Yhatt')
+        plt.plot(yhatdct, label='Yhatt')
         plt.plot(xhat, label='xhat')
         plt.xlabel('k')
         plt.legend()
         plt.subplot(236)
-        plt.plot(yrt, label='Yrt')
+        plt.plot(yrdct, label='Yrt')
         plt.plot(xr, label='xr')
         plt.xlabel('k')
         plt.legend()
@@ -244,19 +296,19 @@ def CS_Ex4(ffmri, ftask, slice=10, verbose=False):
         plt.subplots_adjust(top=0.90, bottom=0.1, hspace=0.4, wspace=0.5)
         plt.savefig('results/sensing_at_%.1f.png' % level)
 
-    # error curve
+    # error curve with Nyquist threshold
     errors = np.asarray(errors)
-    nyHRFPercent = TR*nyHRF  # length*rate / nframes = nframes*TR*nyquist / nframes = TR*nyquist
-    # nyRespPercent = TR*nyResp
+    nyHRFPercent = TR*nyHRF  # length*rate / N = N*TR*nyquist / N = TR*nyquist
+    nyRespPercent = TR*nyResp
 
     plt.figure()
     plt.plot(levels, errors[:,0], label='Y')
     plt.plot(levels, errors[:, 1], label='Yhat')
     plt.plot(levels, errors[:, 2], label='Yr')
-    plt.axvline(x=nyHRFPercent, label='% HRF Nyquist', c='c', ls='--')
+    # plt.axvline(x=nyHRFPercent, label='% HRF Nyquist', c='c', ls='--')
     # plt.axvline(x=nyRespPercent, label='% Resp Nyquist', c='m', ls='--')
     plt.xlabel('Percent sampled')
-    plt.ylabel('RMSE')
+    plt.ylabel('PSNR')
     plt.legend()
     plt.savefig('results/error.png')
 
