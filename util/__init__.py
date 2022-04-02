@@ -7,6 +7,22 @@ Utilities for compressed sensing fMRI time series.
 import numpy as np
 import cvxpy as cvx
 import math
+import scipy.fftpack as spfft
+
+eps = np.finfo(float).eps
+
+def nyquist_rate(ft, xf):
+    """
+    Computes Nyquist rate.
+
+    Params:
+        ft = Fourier transform sequence
+        xf = corresponding frequency domain
+
+    Returns:
+        scalar Nyquist rate
+    """
+    return 2 * xf[np.argwhere(np.abs(ft) > eps).max()]
 
 def mse(true, pred):
     """
@@ -30,7 +46,7 @@ def rmse(true, pred):
         pred = predicted signal
 
     Returns:
-        rmse scalar
+        scalar RMSE
     """
     return np.sqrt(mse(true, pred))
 
@@ -43,7 +59,7 @@ def psnr(true, pred):
         pred = predicted signal
 
     Returns:
-        psnr scalar
+        scalar PSNR
     """
     MSE = mse(true, pred)
     return 100 if MSE == 0 else 20 * math.log10(true.max() / math.sqrt(MSE))
@@ -58,7 +74,7 @@ def scale_fft(ft, N):
         N = sample count
     
     Returns:
-        Scaled FFT sequence with N//2 entries 
+        scaled FFT sequence with N//2 entries
     """
     return 2.0/N * np.abs(ft[:N//2])
 
@@ -93,7 +109,9 @@ def double_gamma_HRF(TR, tmax=30):
     h = h1/np.max(h1) - a2*h2/np.max(h2)
     h /= np.max(h)
 
-    nyquist = 2*(1/tmax)  # double the frequency of 1 HRF at least
+    hfft = scale_fft(spfft.fft(h), tmax)
+    xf = np.linspace(0.0, 1.0 / (2.0 * TR), tmax // 2)
+    nyquist = nyquist_rate(hfft, xf)
 
     return t, h, nyquist
 
