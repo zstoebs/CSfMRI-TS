@@ -85,7 +85,7 @@ def double_gamma_HRF(TR, tmax=30):
 
     Parameters:
         TR = temporal resolution at which to sample in tmax
-        tmax = maximum duration for HRF
+        tmax = maximum duration for HRF, default = 30
 
     Returns:
         t = time course underlying HRF

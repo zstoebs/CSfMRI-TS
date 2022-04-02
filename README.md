@@ -15,6 +15,15 @@ Exploring compressed sensing fMRI time series.
 	1. Analysis of a task-based fMRI to identify the most active voxel correlated to the task and exploring sparse recovery related to the voxel activation, in the context of the Nyquist rates defined by the HRF and task response function. 
 
 ## Usage
+### tutorial
+- Run wave.py to reconstruct a simple waveform using L1 minimization via convex optimization. 
+- Run image.py to reconstruct a downsized image using L1 minimization via convex optimization. 
+- Run optimized.py to reconstruct the full-size image using OWL-QN version of the L-BFGS algorithm. 
+
+### opt
+`python optCSfMRI-TS.py -f <FMRI_FILE> -t <TASK_FILE> [-s <SLICE_INDEX>]`
+
+## Setup 
 - Clone the repository `git clone https://github.com/zstoebs/CSfMRI-TS.git`.
 - Install dependencies
 	1. Install Anaconda. Create a new environment with the dependencies: `conda env create -f environment.yml` (*suggested*), or
