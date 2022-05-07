@@ -26,5 +26,5 @@ Exploring compressed sensing fMRI time series.
 ## Setup 
 - Clone the repository `git clone https://github.com/zstoebs/CSfMRI-TS.git`.
 - Install dependencies
-	1. Install Anaconda. Create a new environment with the dependencies: `conda env create -f environment.yml` (*suggested*), or
+	1. Install Anaconda. Create a new environment with the dependencies: `conda env create -f no-builds.yml` (*suggested*), or
 	2. Install dependencies with `pip -r requirements.txt`.

@@ -1,0 +1,45 @@
+name: CSfMRI
+channels:
+  - defaults
+dependencies:
+  - bzip2=1.0.8
+  - ca-certificates=2022.3.18
+  - certifi=2020.6.20
+  - libcxx=12.0.0
+  - libffi=3.3
+  - ncurses=6.3
+  - openssl=1.1.1n
+  - pip=21.2.4
+  - python=3.10.0
+  - readline=8.1.2
+  - setuptools=58.0.4
+  - sqlite=3.37.2
+  - tk=8.6.11
+  - tzdata=2021e
+  - wheel=0.37.1
+  - xz=5.2.5
+  - zlib=1.2.11
+  - pip:
+    - cvxpy==1.2.0
+    - cycler==0.11.0
+    - ecos==2.0.10
+    - fonttools==4.31.2
+    - kiwisolver==1.4.0
+    - matplotlib==3.5.1
+    - nibabel==3.2.2
+    - numpy==1.22.3
+    - opencv-python==4.5.5.64
+    - osqp==0.6.2.post5
+    - packaging==21.3
+    - pandas==1.4.1
+    - pillow==9.0.1
+    - pybind11==2.9.1
+    - pylbfgs==0.2.0.14
+    - pyparsing==3.0.7
+    - python-dateutil==2.8.2
+    - pytz==2022.1
+    - qdldl==0.1.5.post0
+    - scipy==1.8.0
+    - scs==3.2.0
+    - six==1.16.0
+prefix: /opt/anaconda3/envs/CSfMRI
