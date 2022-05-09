@@ -284,20 +284,22 @@ def optCSfMRI_TS(ffmri, ftask, method='convex', slice=10, block=30, verbose=Fals
             sighat = spfft.idct(xhat, norm='ortho', axis=0)
             sigr = spfft.idct(xr, norm='ortho', axis=0)
         elif method.lower() == 'bsbl':
-            Phi = np.diag(dpss(N, 8.5))
+            A = spfft.idct(np.identity(N), norm='ortho', axis=0)  # inverse discrete cosine transform
+            M = A[ri]
             blk_start_loc = np.arange(0, N, block)
 
             clf = bsbl.bo(
                 learn_lambda=1,
+                prune_gamma=-1,
                 learn_type=1,
                 lambda_init=1e-3,
                 epsilon=1e-5,
                 max_iters=100,
                 verbose=1,
             )
-            x = clf.fit_transform(Phi, y1, blk_start_loc)
-            xhat = clf.fit_transform(Phi, yhat1, blk_start_loc)
-            xr = clf.fit_transform(Phi, yr1, blk_start_loc)
+            x = clf.fit_transform(M, y1, blk_start_loc)
+            xhat = clf.fit_transform(M, yhat1, blk_start_loc)
+            xr = clf.fit_transform(M, yr1, blk_start_loc)
 
             sig = spfft.idct(x, norm='ortho', axis=0)  # fully-sampled inverse cosine transform of input
             sighat = spfft.idct(xhat, norm='ortho', axis=0)
