@@ -1,0 +1,3 @@
+[submodule "pyBSBL"]
+	path = pyBSBL
+	url = https://github.com/liubenyuan/pyBSBL.git

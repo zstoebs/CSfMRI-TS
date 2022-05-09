@@ -6,7 +6,9 @@ Optimization-based compressed sensing of fMRI time series.
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 import scipy.stats as spstat
+from scipy.signal.windows import dpss
 import pandas as pd
 import nibabel as nb
 import argparse
@@ -14,6 +16,8 @@ from lbfgs import fmin_lbfgs as owlqn
 from util import *
 
 from util.opt import f_owlqn, progress, CS_L1_opt
+
+from pyBSBL import bsbl
 
 
 def get_args():
@@ -29,11 +33,12 @@ def get_args():
 
     parser.add_argument('--method', '-m', type=str, default='convex',
                         help='optimization method [convex | owlqn | bsbl]. default=convex')
+    parser.add_argument('--block', '-b', type=int, default=30, help='block length for BSBL')
 
     return parser.parse_args()
 
 
-def optCSfMRI_TS(ffmri, ftask, method='convex', slice=10, verbose=False):
+def optCSfMRI_TS(ffmri, ftask, method='convex', slice=10, block=30, verbose=False):
     """
     Compressed sensing a voxel time series via L1 minimization through convex optimization.
 
@@ -263,6 +268,10 @@ def optCSfMRI_TS(ffmri, ftask, method='convex', slice=10, verbose=False):
             x = CS_L1_opt(M, y1, verbose=verbose)
             xhat = CS_L1_opt(M, yhat1, verbose=verbose)
             xr = CS_L1_opt(M, yr1, verbose=verbose)
+
+            sig = spfft.idct(x, norm='ortho', axis=0)  # fully-sampled inverse cosine transform of input
+            sighat = spfft.idct(xhat, norm='ortho', axis=0)
+            sigr = spfft.idct(xr, norm='ortho', axis=0)
         elif method.lower() == 'owlqn':
             x = owlqn(f_owlqn, y, progress=progress, orthantwise_c=5,
                          line_search='wolfe', args=(y1, ri))
@@ -270,12 +279,31 @@ def optCSfMRI_TS(ffmri, ftask, method='convex', slice=10, verbose=False):
                       line_search='wolfe', args=(yhat1, ri))
             xr = owlqn(f_owlqn, yr, progress=progress, orthantwise_c=5,
                       line_search='wolfe', args=(yr1, ri))
+
+            sig = spfft.idct(x, norm='ortho', axis=0)  # fully-sampled inverse cosine transform of input
+            sighat = spfft.idct(xhat, norm='ortho', axis=0)
+            sigr = spfft.idct(xr, norm='ortho', axis=0)
+        elif method.lower() == 'bsbl':
+            Phi = np.diag(dpss(N, 8.5))
+            blk_start_loc = np.arange(0, N, block)
+
+            clf = bsbl.bo(
+                learn_lambda=1,
+                learn_type=1,
+                lambda_init=1e-3,
+                epsilon=1e-5,
+                max_iters=100,
+                verbose=1,
+            )
+            x = clf.fit_transform(Phi, y1, blk_start_loc)
+            xhat = clf.fit_transform(Phi, yhat1, blk_start_loc)
+            xr = clf.fit_transform(Phi, yr1, blk_start_loc)
+
+            sig = spfft.idct(x, norm='ortho', axis=0)  # fully-sampled inverse cosine transform of input
+            sighat = spfft.idct(xhat, norm='ortho', axis=0)
+            sigr = spfft.idct(xr, norm='ortho', axis=0)
         else:
             raise ValueError('Unknown method: ', method)
-
-        sig = spfft.idct(x, norm='ortho', axis=0)  # fully-sampled inverse cosine transform of input
-        sighat = spfft.idct(xhat, norm='ortho', axis=0)
-        sigr = spfft.idct(xr, norm='ortho', axis=0)
 
         y_rmse = rmse(y, sig)
         yhat_rmse = rmse(yhat, sighat)
@@ -349,7 +377,7 @@ def optCSfMRI_TS(ffmri, ftask, method='convex', slice=10, verbose=False):
     plt.axvline(x=nyHRFPercent, label='%% HRF Nyquist = %.2f' % nyHRFPercent, c='c', ls='--')
     plt.axvline(x=nyRespPercent, label='%% Resp Nyquist = %.2f' % nyRespPercent, c='m', ls='--')
     plt.xlabel('Percent sampled')
-    plt.ylabel('PSNR')
+    plt.ylabel('RMSE')
     plt.legend()
     plt.subplot(122)
     plt.plot(levels, PSNRs[:, 0], label='Y')
@@ -371,7 +399,7 @@ def main(**kwargs):
 
     ###
     print('Compressed sensing time series...')
-    optCSfMRI_TS(ffmri=args.fmri, ftask=args.task, method=args.method, slice=args.slice, verbose=args.verbose)
+    optCSfMRI_TS(ffmri=args.fmri, ftask=args.task, method=args.method, slice=args.slice, block=args.block, verbose=args.verbose)
 
     return 0
 
